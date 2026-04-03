@@ -248,3 +248,53 @@ class BugHuntEnvironment:
             except Exception as exc:
                 status = "error"
                 output = str(exc)
+            self._test_results[test.test_id] = TestResult(
+                test_id=test.test_id,
+                description=test.description,
+                status=status,
+                output=output,
+            )
+
+        final_score = self._score()
+        self._submitted = True
+        self._state.final_score = final_score
+        self._state.is_submitted = True
+
+        passed_count = sum(1 for r in self._test_results.values() if r.status == "pass")
+        total = len(self._task.tests)
+        self._ops_log.append("submit()")
+
+        return self._make_obs(
+            reward=final_score,
+            done=True,
+            message=(
+                f"Submitted! Score: {final_score:.2f} "
+                f"({passed_count}/{total} tests passing)."
+            ),
+        )
+
+    # ------------------------------------------------------------------
+    # Scoring & helpers
+    # ------------------------------------------------------------------
+
+    def _score(self) -> float:
+        """Run ALL tests silently and return fraction passing."""
+        if not self._task:
+            return 0.0
+        passed = sum(1 for t in self._task.tests if self._run_silent(t))
+        return passed / len(self._task.tests)
+
+    def _run_silent(self, test) -> bool:
+        try:
+            return bool(test.run(self._namespace))
+        except Exception:
+            return False
+
+    def _exec_into_namespace(self, code: str, name: str):
+        """
+        Exec a function definition into the shared namespace.
+        Returns (success: bool, error_msg: str).
+        """
+        code = code.strip()
+        if not code.startswith("def "):
+            return False, "Code must start with 'def '."
