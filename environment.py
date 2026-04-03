@@ -298,3 +298,49 @@ class BugHuntEnvironment:
         code = code.strip()
         if not code.startswith("def "):
             return False, "Code must start with 'def '."
+
+        try:
+            exec(compile(code, f"<{name}>", "exec"), self._namespace)
+        except SyntaxError as e:
+            return False, f"SyntaxError: {e}"
+        except Exception as e:
+            return False, f"Error: {e}"
+
+        if name not in self._namespace:
+            return False, f"Expected function '{name}' not found after exec."
+
+        return True, ""
+
+    # Keep for backward compat with reset()
+    def _exec_function(self, code: str, name: str):
+        """Exec into shared namespace; return (ok, err, fn_or_None)."""
+        ok, err = self._exec_into_namespace(code, name)
+        return ok, err, self._namespace.get(name) if ok else None
+
+    def _make_obs(
+        self,
+        reward: Optional[float],
+        done: bool,
+        message: str,
+    ) -> BugHuntObservation:
+        ops_remaining = max(0, self._task.max_operations - self._state.step_count)
+        score = self._score()
+        passed = sum(1 for t in self._task.tests if self._run_silent(t))
+
+        return BugHuntObservation(
+            done=done,
+            reward=reward,
+            task_id=self._task.task_id,
+            task_description=self._task.description,
+            task_context=self._task.context,
+            available_functions=list(self._task.buggy_functions.keys()),
+            available_tests=[t.test_id for t in self._task.tests],
+            inspected_functions=dict(self._inspected),
+            test_results=list(self._test_results.values()),
+            operations_log=list(self._ops_log),
+            operations_remaining=ops_remaining,
+            current_score=score,
+            tests_passed=passed,
+            tests_total=len(self._task.tests),
+            message=message,
+        )
