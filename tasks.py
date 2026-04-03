@@ -278,3 +278,103 @@ def calculate_final_grade(assignments, midterm, final_exam, weights=(0.3, 0.3, 0
     weights     : (assignment_weight, midterm_weight, final_weight) summing to 1.0
     """
     if not assignments:
+        return "F"
+    avg_assignment = sum(assignments) / len(assignments)
+    composite = weighted_average(
+        [avg_assignment, final_exam, midterm],   # BUG 2: final_exam and midterm are swapped
+        list(weights)
+    )
+    return letter_grade(composite)
+''',
+
+    "class_statistics": '''\
+def class_statistics(student_scores):
+    """Compute summary statistics for a class.
+    student_scores: dict of { student_name: numeric_score }
+    Returns {"mean": float, "highest": float, "lowest": float, "passing": int}
+    A student passes with a score >= 60.
+    """
+    if not student_scores:
+        return {"mean": 0, "highest": 0, "lowest": 0, "passing": 0}
+    scores = list(student_scores.values())
+    passing = sum(1 for s in scores if s > 60)   # BUG 3: should be >= 60
+    return {
+        "mean": round(sum(scores) / len(scores), 2),
+        "highest": max(scores),
+        "lowest": min(scores),
+        "passing": passing,
+    }
+''',
+}
+
+HARD_TESTS: List[TestCase] = [
+    # weighted_average tests (affected by Bug 1 only)
+    TestCase(
+        test_id="H1",
+        description="weighted_average([80, 90, 70], [0.3, 0.3, 0.4]) should return 79.0",
+        run=lambda ns: _run_approx(
+            "weighted_average([80, 90, 70], [0.3, 0.3, 0.4])", 79.0, 0.01, ns),
+        failure_hint="Check the operator inside the loop: score + weight should be score * weight.",
+    ),
+    TestCase(
+        test_id="H2",
+        description="weighted_average([100, 100], [0.5, 0.5]) should return 100.0",
+        run=lambda ns: _run_approx(
+            "weighted_average([100, 100], [0.5, 0.5])", 100.0, 0.01, ns),
+        failure_hint="With equal weights summing to 1, weighted average of equal values should equal that value.",
+    ),
+    TestCase(
+        test_id="H3",
+        description="weighted_average([50, 60, 70], [0.25, 0.25, 0.5]) should return 62.5",
+        run=lambda ns: _run_approx(
+            "weighted_average([50, 60, 70], [0.25, 0.25, 0.5])", 62.5, 0.01, ns),
+        failure_hint="50*0.25 + 60*0.25 + 70*0.5 = 12.5 + 15 + 35 = 62.5",
+    ),
+
+    # calculate_final_grade tests (affected by Bug 1 AND Bug 2 together)
+    TestCase(
+        test_id="H4",
+        description="calculate_final_grade([80,85], midterm=75, final_exam=90) should return 'B'",
+        run=lambda ns: _run(
+            'calculate_final_grade([80, 85], 75, 90)', "B", ns),
+        failure_hint=(
+            "Two bugs affect this: (1) score+weight vs score*weight, "
+            "(2) midterm and final_exam are swapped in the call to weighted_average."
+        ),
+    ),
+    TestCase(
+        test_id="H5",
+        description="calculate_final_grade([95,100], midterm=92, final_exam=98) should return 'A'",
+        run=lambda ns: _run(
+            'calculate_final_grade([95, 100], 92, 98)', "A", ns),
+        failure_hint="Fix both Bug 1 and Bug 2 — swapped arguments only matter after arithmetic is corrected.",
+    ),
+    TestCase(
+        test_id="H6",
+        description="calculate_final_grade([55,60], midterm=50, final_exam=45) should return 'F'",
+        run=lambda ns: _run(
+            'calculate_final_grade([55, 60], 50, 45)', "F", ns),
+        failure_hint="Low scores across the board should yield F.",
+    ),
+    TestCase(
+        test_id="H7",
+        description="calculate_final_grade([], midterm=80, final_exam=90) should return 'F' (no assignments)",
+        run=lambda ns: _run(
+            'calculate_final_grade([], 80, 90)', "F", ns),
+        failure_hint="Empty assignments list returns F immediately — should already pass.",
+    ),
+
+    # class_statistics tests (affected by Bug 3 only — independent)
+    TestCase(
+        test_id="H8",
+        description='class_statistics({"A":60,"B":75,"C":55})["passing"] should return 2',
+        run=lambda ns: _run(
+            'class_statistics({"A": 60, "B": 75, "C": 55})["passing"]', 2, ns),
+        failure_hint="Score of exactly 60 should count as passing (>= 60, not > 60).",
+    ),
+    TestCase(
+        test_id="H9",
+        description='class_statistics({"A":85,"B":55})["passing"] should return 1',
+        run=lambda ns: _run(
+            'class_statistics({"A": 85, "B": 55})["passing"]', 1, ns),
+        failure_hint="55 is below 60, only one student passes — should already pass.",
