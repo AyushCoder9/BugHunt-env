@@ -43,3 +43,24 @@ class BugHuntObservation(BaseModel):
     task_context: str = ""          # narrative about what the module does
 
     # Available targets
+    available_functions: List[str] = Field(default_factory=list)
+    available_tests: List[str] = Field(default_factory=list)
+
+    # State
+    inspected_functions: Dict[str, str] = Field(default_factory=dict)   # name → source
+    test_results: List[TestResult] = Field(default_factory=list)
+    operations_log: List[str] = Field(default_factory=list)
+    operations_remaining: int = 20
+    current_score: float = 0.0
+    tests_passed: int = 0
+    tests_total: int = 0
+    message: str = ""
+
+
+class BugHuntState(BaseModel):
+    """Episode metadata."""
+    episode_id: Optional[str] = None
+    step_count: int = 0
+    task_id: str = ""
+    final_score: Optional[float] = None
+    is_submitted: bool = False
