@@ -48,3 +48,63 @@ class BugHuntEnvironment:
         self._ops_log: List[str] = []
         self._submitted = False
 
+    # ------------------------------------------------------------------
+    # OpenEnv interface
+    # ------------------------------------------------------------------
+
+    def reset(
+        self,
+        task_id: str = "easy",
+        episode_id: Optional[str] = None,
+        **kwargs,
+    ) -> BugHuntObservation:
+        task_fn = TASKS.get(task_id, TASKS["easy"])
+        self._task = task_fn()
+        self._submitted = False
+        self._ops_log = []
+        self._inspected = {}
+
+        # One shared namespace — all functions live here so cross-calls
+        # (e.g. calculate_final_grade -> weighted_average) always resolve
+        # to whatever implementation is currently installed.
+        self._namespace = {"__builtins__": SAFE_BUILTINS}
+        for name, code in self._task.buggy_functions.items():
+            try:
+                exec(compile(code.strip(), f"<{name}>", "exec"), self._namespace)
+            except Exception:
+                pass
+
+        # All tests start as not_run
+        self._test_results = {
+            t.test_id: TestResult(
+                test_id=t.test_id,
+                description=t.description,
+                status="not_run",
+            )
+            for t in self._task.tests
+        }
+
+        self._state = BugHuntState(
+            episode_id=episode_id or str(uuid.uuid4()),
+            step_count=0,
+            task_id=task_id,
+        )
+
+        return self._make_obs(
+            reward=None,
+            done=False,
+            message=(
+                f"Episode started. You have {self._task.max_operations} operations. "
+                f"Inspect functions, run tests, then propose fixes. Call submit when done."
+            ),
+        )
+
+    def step(
+        self,
+        action: BugHuntAction,
+        **kwargs,
+    ) -> BugHuntObservation:
+        if self._submitted:
+            return self._make_obs(reward=0.0, done=True, message="Episode already submitted.")
+
+        self._state.step_count += 1
