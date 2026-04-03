@@ -378,3 +378,84 @@ HARD_TESTS: List[TestCase] = [
         run=lambda ns: _run(
             'class_statistics({"A": 85, "B": 55})["passing"]', 1, ns),
         failure_hint="55 is below 60, only one student passes — should already pass.",
+    ),
+]
+
+
+# ---------------------------------------------------------------------------
+# Task registry
+# ---------------------------------------------------------------------------
+
+@dataclass
+class Task:
+    task_id: str
+    difficulty: str
+    description: str
+    context: str
+    buggy_functions: Dict[str, str]
+    tests: List[TestCase]
+    max_operations: int
+    num_bugs: int
+
+
+def get_easy_task() -> Task:
+    return Task(
+        task_id="easy",
+        difficulty="easy",
+        description="Fix 1 bug in a statistics module",
+        context=(
+            "You are debugging a Python statistics module used by a data analysis pipeline. "
+            "The module exports calculate_average and find_maximum. "
+            "Something is wrong with calculate_average — three out of five tests are failing. "
+            "Inspect the function, locate the bug, and propose a fix."
+        ),
+        buggy_functions=dict(EASY_FUNCTIONS),
+        tests=list(EASY_TESTS),
+        max_operations=10,
+        num_bugs=1,
+    )
+
+
+def get_medium_task() -> Task:
+    return Task(
+        task_id="medium",
+        difficulty="medium",
+        description="Fix 2 independent bugs in a text processing module",
+        context=(
+            "You are debugging a text processing utility library. "
+            "It exports reverse_words, truncate_text, and count_words. "
+            "Four out of seven tests are failing — two different functions have bugs. "
+            "You need to find and fix both independently."
+        ),
+        buggy_functions=dict(MEDIUM_FUNCTIONS),
+        tests=list(MEDIUM_TESTS),
+        max_operations=15,
+        num_bugs=2,
+    )
+
+
+def get_hard_task() -> Task:
+    return Task(
+        task_id="hard",
+        difficulty="hard",
+        description="Fix 3 bugs in a grade calculator — two are interdependent",
+        context=(
+            "You are debugging a university grade calculation system. "
+            "It exports letter_grade, weighted_average, calculate_final_grade, and class_statistics. "
+            "Six out of nine tests are failing. "
+            "WARNING: Two of the three bugs interact — fixing one without the other "
+            "will NOT make the affected tests pass. You must understand both before either fix helps. "
+            "The third bug is independent and can be fixed at any time."
+        ),
+        buggy_functions=dict(HARD_FUNCTIONS),
+        tests=list(HARD_TESTS),
+        max_operations=20,
+        num_bugs=3,
+    )
+
+
+TASKS = {
+    "easy":   get_easy_task,
+    "medium": get_medium_task,
+    "hard":   get_hard_task,
+}
