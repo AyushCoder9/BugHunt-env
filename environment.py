@@ -178,3 +178,73 @@ class BugHuntEnvironment:
             test_id=tid,
             description=test.description,
             status=status,
+            output=output,
+        )
+        self._ops_log.append(f"run_test('{tid}') → {status}")
+        verdict = "PASSED ✅" if status == "pass" else f"FAILED ❌ — {output}"
+        return 0.0, f"Test {tid}: {verdict}"
+
+    def _handle_propose_fix(self, action: BugHuntAction):
+        name = action.function_name
+        code = action.new_code
+
+        if not name or not code:
+            return -0.05, "propose_fix requires both function_name and new_code."
+        if name not in self._task.buggy_functions:
+            available = list(self._task.buggy_functions.keys())
+            return -0.05, f"No function '{name}'. Available: {available}"
+
+        # Security check
+        for bad in _FORBIDDEN:
+            if bad in code:
+                return -0.05, f"Forbidden pattern '{bad}' in proposed code."
+
+        prev_score = self._score()
+
+        ok, err = self._exec_into_namespace(code, name)
+        if not ok:
+            self._ops_log.append(f"propose_fix('{name}') -> REJECTED: {err}")
+            return -0.05, f"Fix rejected — {err}" 
+
+        # Re-run all previously-run tests so score updates immediately
+        for tid, result in self._test_results.items():
+            if result.status != "not_run":
+                test = next(t for t in self._task.tests if t.test_id == tid)
+                try:
+                    passed = test.run(self._namespace)
+                    self._test_results[tid] = TestResult(
+                        test_id=tid,
+                        description=test.description,
+                        status="pass" if passed else "fail",
+                        output="" if passed else test.failure_hint,
+                    )
+                except Exception as exc:
+                    self._test_results[tid] = TestResult(
+                        test_id=tid,
+                        description=test.description,
+                        status="error",
+                        output=str(exc),
+                    )
+
+        new_score = self._score()
+        delta = new_score - prev_score
+        reward = delta if delta > 0 else -0.05
+
+        self._ops_log.append(
+            f"propose_fix('{name}') → accepted | score {prev_score:.2f} → {new_score:.2f}"
+        )
+        if delta > 0:
+            return reward, f"Fix accepted! Score improved {prev_score:.2f} → {new_score:.2f}."
+        else:
+            return reward, f"Fix accepted but score did not improve ({new_score:.2f}). Check your logic."
+
+    def _handle_submit(self) -> BugHuntObservation:
+        # Run ALL tests before final score
+        for test in self._task.tests:
+            try:
+                passed = test.run(self._namespace)
+                status = "pass" if passed else "fail"
+                output = "" if passed else test.failure_hint
+            except Exception as exc:
+                status = "error"
+                output = str(exc)
