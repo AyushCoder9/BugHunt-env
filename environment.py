@@ -108,3 +108,73 @@ class BugHuntEnvironment:
             return self._make_obs(reward=0.0, done=True, message="Episode already submitted.")
 
         self._state.step_count += 1
+        ops_remaining = self._task.max_operations - self._state.step_count
+
+        if action.action_type == "submit":
+            return self._handle_submit()
+
+        if action.action_type == "inspect_function":
+            reward, message = self._handle_inspect(action)
+        elif action.action_type == "run_test":
+            reward, message = self._handle_run_test(action)
+        elif action.action_type == "propose_fix":
+            reward, message = self._handle_propose_fix(action)
+        else:
+            reward = -0.05
+            message = f"Unknown action_type '{action.action_type}'. Use inspect_function | run_test | propose_fix | submit."
+
+        done = ops_remaining <= 0
+        if done:
+            self._submitted = True
+            final_score = self._score()
+            self._state.final_score = final_score
+            self._state.is_submitted = True
+            return self._make_obs(
+                reward=final_score,
+                done=True,
+                message=f"Operations exhausted — auto-submitted. Final score: {final_score:.2f}",
+            )
+
+        return self._make_obs(reward=reward, done=False, message=message)
+
+    @property
+    def state(self) -> BugHuntState:
+        return self._state
+
+    # ------------------------------------------------------------------
+    # Action handlers
+    # ------------------------------------------------------------------
+
+    def _handle_inspect(self, action: BugHuntAction):
+        name = action.function_name
+        if not name:
+            return -0.05, "inspect_function requires a function_name."
+        if name not in self._task.buggy_functions:
+            available = list(self._task.buggy_functions.keys())
+            return -0.05, f"No function '{name}'. Available: {available}"
+        self._inspected[name] = self._task.buggy_functions[name]
+        self._ops_log.append(f"inspect_function('{name}')")
+        return 0.0, f"Inspected '{name}'. Source code is now in your observation."
+
+    def _handle_run_test(self, action: BugHuntAction):
+        tid = action.test_id
+        if not tid:
+            return -0.05, "run_test requires a test_id."
+        test_map = {t.test_id: t for t in self._task.tests}
+        if tid not in test_map:
+            available = [t.test_id for t in self._task.tests]
+            return -0.05, f"No test '{tid}'. Available: {available}"
+
+        test = test_map[tid]
+        try:
+            passed = test.run(self._namespace)
+            status = "pass" if passed else "fail"
+            output = "" if passed else test.failure_hint
+        except Exception as exc:
+            status = "error"
+            output = str(exc)
+
+        self._test_results[tid] = TestResult(
+            test_id=tid,
+            description=test.description,
+            status=status,
