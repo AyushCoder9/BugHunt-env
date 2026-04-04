@@ -1,0 +1,90 @@
+name: bughunt
+version: "1.0.0"
+description: >
+ An OpenEnv RL environment where AI agents debug Python code.
+ Agents inspect functions, run tests, and propose fixes to earn rewards.
+ Three tasks of increasing difficulty with a unique interdependency mechanic on hard.
+author: ayushxx9
+tags:
+ - openenv
+ - debugging
+ - code
+ - real-world
+
+
+tasks:
+ - id: easy
+   description: "Fix 1 off-by-one bug in a statistics module. 5 tests, max 10 ops."
+   difficulty: easy
+   num_bugs: 1
+   max_score: 1.0
+   max_operations: 10
+
+
+ - id: medium
+   description: "Fix 2 independent bugs in a text processing module. 7 tests, max 15 ops."
+   difficulty: medium
+   num_bugs: 2
+   max_score: 1.0
+   max_operations: 15
+
+
+ - id: hard
+   description: >
+     Fix 3 bugs in a grade calculator. Two bugs are interdependent — fixing one without
+    the other produces no improvement. Agent must reason about both before proposing fixes.
+    9 tests, max 20 ops.
+   difficulty: hard
+   num_bugs: 3
+   max_score: 1.0
+   max_operations: 20
+
+
+action_space:
+ type: structured_json
+ actions:
+   inspect_function: "Read source code of a function (free action)"
+   run_test: "Run a specific test case, see pass/fail + hint"
+   propose_fix: "Replace a function with new implementation"
+   submit: "Finalise the episode"
+
+
+observation_space:
+ type: structured_json
+ fields:
+   done: "bool"
+   reward: "float | null"
+   task_id: "str — easy | medium | hard"
+   task_description: "str"
+   task_context: "str — narrative about the buggy module"
+   available_functions: "list[str]"
+   available_tests: "list[str]"
+   inspected_functions: "dict[str, str] — source code of inspected functions"
+   test_results: "list[{test_id, description, status, output}]"
+   operations_log: "list[str]"
+   operations_remaining: "int"
+   current_score: "float — tests_passed / tests_total"
+   tests_passed: "int"
+   tests_total: "int"
+   message: "str"
+
+
+reward:
+ description: >
+   inspect_function / run_test: 0.0 (free information gathering).
+  propose_fix that improves score: reward = new_score - prev_score (> 0).
+  propose_fix with no improvement or invalid: -0.05.
+  submit() or auto-submit: final_score in [0, 1].
+ range: [-0.05, 1.0]
+
+
+endpoints:
+ http:
+   - GET  /health
+   - POST /reset?task_id=easy
+   - POST /step
+   - GET  /state
+   - GET  /docs
+   - GET  /web
+ websocket:
+   - WS /ws
