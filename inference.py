@@ -265,3 +265,100 @@ def call_llm(messages: list[dict]) -> str:
 
    return FALLBACK
 
+
+
+
+# ---------------------------------------------------------------------------
+# Prompt builder
+# ---------------------------------------------------------------------------
+
+
+def build_prompt(obs: dict, step: int) -> str:
+   task_id = obs.get("task_id", "").upper()
+   lines = [
+       f"=== BUGHUNT | {task_id} | Step {step} ===",
+       "",
+       f"Context: {obs.get('task_context', '')}",
+       "",
+       f"Score: {obs.get('current_score', 0):.2f}  "
+       f"({obs.get('tests_passed', 0)}/{obs.get('tests_total', 0)} tests passing)  "
+       f"Ops remaining: {obs.get('operations_remaining', 0)}",
+       "",
+   ]
+
+
+   # Available functions
+   lines += [
+       "─── Available functions to inspect/fix ───",
+       "  " + ", ".join(obs.get("available_functions", [])),
+       "",
+   ]
+
+
+   # Inspected source
+   inspected = obs.get("inspected_functions", {})
+   if inspected:
+       lines.append("─── Inspected source code ───")
+       for name, src in inspected.items():
+           lines.append(f"\n[{name}]\n{src}")
+       lines.append("")
+
+
+   # Test results
+   test_results = obs.get("test_results", [])
+   if test_results:
+       lines.append("─── Test results ───")
+       for tr in test_results:
+           status = tr.get("status", "not_run")
+           icon = {"pass": "✅", "fail": "❌", "error": "💥", "not_run": "⬜"}[status]
+           line = f"  {icon} [{tr['test_id']}] {tr['description']}"
+           if status in ("fail", "error") and tr.get("output"):
+               line += f"\n       Hint: {tr['output']}"
+           lines.append(line)
+       lines.append("")
+
+
+   # Ops log
+   log = obs.get("operations_log", [])
+   if log:
+       lines.append("─── Operations so far ───")
+       for op in log[-8:]:   # last 8 to keep context short
+           lines.append(f"  {op}")
+       lines.append("")
+
+
+   lines += [
+       f"Last message: {obs.get('message', '')}",
+       "",
+       "Your next action (JSON only):",
+   ]
+   return "\n".join(lines)
+
+
+
+
+# ---------------------------------------------------------------------------
+# Parse model output
+# ---------------------------------------------------------------------------
+
+
+def parse_action(text: str) -> dict:
+   text = text.strip()
+   # Strip markdown fences if model added them
+   for fence in ["```json", "```"]:
+       if fence in text:
+           text = text.split(fence)[1].split("```")[0].strip()
+           break
+   try:
+       return json.loads(text)
+   except json.JSONDecodeError:
+       # Try to extract JSON from the text
+       start = text.find("{")
+       end = text.rfind("}") + 1
+       if start != -1 and end > start:
+           try:
+               return json.loads(text[start:end])
+           except Exception:
+               pass
+   return {"action_type": "submit"}
+
