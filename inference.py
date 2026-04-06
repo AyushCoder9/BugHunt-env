@@ -207,3 +207,61 @@ def step_env(action: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Multi-provider LLM caller with automatic fallback
+# ---------------------------------------------------------------------------
+
+
+# Track which provider index we are currently using so consecutive calls
+# reuse the same provider unless it fails.
+_current_provider_idx = 0
+
+
+
+
+def call_llm(messages: list[dict]) -> str:
+   """
+   Call the LLM using the OpenAI client.  If the active provider returns a
+   quota / rate-limit error, automatically switch to the next available
+   provider and retry.  Returns the response text, or FALLBACK on total
+   failure.
+   """
+   global _current_provider_idx
+
+
+   # Try from the current provider onwards; wrap around at most once through
+   # the full list so we don't loop forever.
+   attempts = list(range(_current_provider_idx, len(PROVIDERS))) + \
+              list(range(0, _current_provider_idx))
+
+
+   for idx in attempts:
+       provider = PROVIDERS[idx]
+       try:
+           c = OpenAI(base_url=provider["base_url"], api_key=provider["api_key"])
+           completion = c.chat.completions.create(
+               model=provider["model"],
+               messages=messages,
+               temperature=TEMPERATURE,
+               max_tokens=MAX_TOKENS,
+           )
+           # Success — lock to this provider for future calls
+           if idx != _current_provider_idx:
+               print(f"  ✦ Switched to provider: {provider['name']}")
+               _current_provider_idx = idx
+           return completion.choices[0].message.content or ""
+
+
+       except Exception as exc:
+           err = str(exc).lower()
+           is_quota_issue = any(t in err for t in _FALLBACK_TRIGGERS)
+           if is_quota_issue and idx != attempts[-1]:
+               next_p = PROVIDERS[attempts[attempts.index(idx) + 1]]
+               print(f"  ⚠ {provider['name']} quota/rate-limit — trying {next_p['name']}")
+               continue
+           # Non-retriable error or last provider
+           print(f"  ⚠ LLM call failed ({provider['name']}): {exc} — using submit fallback.")
+           return FALLBACK
+
+
+   return FALLBACK
+
