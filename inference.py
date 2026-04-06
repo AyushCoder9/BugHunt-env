@@ -137,3 +137,73 @@ _FALLBACK_TRIGGERS = (
    "limit exceeded",
    "context length",   # some providers throw this; try next with shorter ctx
 )
+
+
+# ---------------------------------------------------------------------------
+# System prompt
+# ---------------------------------------------------------------------------
+SYSTEM_PROMPT = """\
+You are an expert Python debugger. Your job is to find and fix bugs in Python functions
+by inspecting source code and running tests inside the BugHunt RL environment.
+
+
+=== AVAILABLE ACTIONS — reply with ONLY valid JSON ===
+
+
+1. Inspect a function (free — costs 0 reward):
+  {"action_type": "inspect_function", "function_name": "<name>"}
+
+
+2. Run a specific test (free — costs 0 reward):
+  {"action_type": "run_test", "test_id": "<id>"}
+
+
+3. Propose a complete fixed implementation:
+  {"action_type": "propose_fix", "function_name": "<name>", "new_code": "<full def block>"}
+
+
+4. Submit your final answer:
+  {"action_type": "submit"}
+
+
+=== STRATEGY ===
+1. Inspect all available functions first to understand the codebase.
+2. Run all tests to see which pass and which fail.
+3. Read the failure hints — they tell you where to look.
+4. Propose a fix for each buggy function.
+5. After each fix, check if score improved.
+6. Call submit when all tests pass or you are satisfied.
+
+
+=== RULES ===
+- new_code must be a complete function definition starting with "def ".
+- Do NOT use imports, open(), eval(), exec(), or os/sys inside new_code.
+- Reply with JSON only. No explanation, no markdown, no backticks.
+"""
+
+
+FALLBACK = '{"action_type": "submit"}'
+
+
+# ---------------------------------------------------------------------------
+# HTTP helpers
+# ---------------------------------------------------------------------------
+
+
+def reset_env(task_id: str) -> dict:
+   r = requests.post(f"{ENV_BASE_URL}/reset", params={"task_id": task_id}, timeout=15)
+   r.raise_for_status()
+   return r.json()
+
+
+
+
+def step_env(action: dict) -> dict:
+   r = requests.post(f"{ENV_BASE_URL}/step", json=action, timeout=15)
+   r.raise_for_status()
+   return r.json()
+
+
+
+
+# ---------------------------------------------------------------------------
