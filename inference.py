@@ -362,3 +362,145 @@ def parse_action(text: str) -> dict:
                pass
    return {"action_type": "submit"}
 
+
+
+
+# ---------------------------------------------------------------------------
+# Run one task
+# ---------------------------------------------------------------------------
+
+
+def run_task(task_id: str) -> float:
+   print(f"\n{'='*60}")
+   print(f"  TASK: {task_id.upper()}")
+   print(f"{'='*60}")
+
+
+   result = reset_env(task_id)
+   obs    = result["observation"]
+   done   = result.get("done", False)
+
+
+   print(f"  {obs.get('task_description', '')}")
+   print(f"  Tests: {obs.get('tests_total', 0)}  |  Max ops: {obs.get('operations_remaining', '?')}")
+
+
+   final_score = 0.0
+
+
+   for step in range(1, MAX_STEPS + 1):
+       if done:
+           final_score = result.get("reward") or 0.0
+           print(f"\n  ✓ Finished at step {step-1}. Score: {final_score:.3f}")
+           break
+
+
+       prompt = build_prompt(obs, step)
+
+
+       messages = [
+           {"role": "system", "content": SYSTEM_PROMPT},
+           {"role": "user",   "content": prompt},
+       ]
+       response_text = call_llm(messages)
+
+
+       action = parse_action(response_text)
+       atype  = action.get("action_type", "?")
+       detail = ""
+       if "function_name" in action:
+           detail = f"({action['function_name']})"
+       elif "test_id" in action:
+           detail = f"({action['test_id']})"
+
+
+       print(f"  Step {step:2d}: {atype}{detail}")
+
+
+       result = step_env(action)
+       obs    = result.get("observation", {})
+       reward = result.get("reward") or 0.0
+       done   = result.get("done", False)
+
+
+       score_str = f"score={obs.get('current_score', 0):.2f}"
+       print(f"         {score_str}  reward={reward:+.3f}  done={done}")
+       if obs.get("message"):
+           print(f"         {obs['message'][:100]}")
+
+
+   else:
+       result = step_env({"action_type": "submit"})
+       final_score = result.get("reward") or 0.0
+       print(f"\n  ⚠ Max steps reached. Score: {final_score:.3f}")
+
+
+   return final_score
+
+
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+
+def main() -> dict:
+   if not PROVIDERS:
+       print("❌ No API keys found. Set at least one of:")
+       print("   HF_TOKEN / OPENAI_API_KEY / GROQ_API_KEY / GEMINI_API_KEY")
+       sys.exit(1)
+
+
+   print("BugHunt — Baseline Inference")
+   print(f"  Env URL : {ENV_BASE_URL}")
+   print(f"  Providers ({len(PROVIDERS)} configured):")
+   for i, p in enumerate(PROVIDERS):
+       marker = "→ active" if i == 0 else "  fallback"
+       print(f"    [{i+1}] {marker}  {p['name']}  model={p['model']}")
+
+
+   # Health check
+   try:
+       r = requests.get(f"{ENV_BASE_URL}/health", timeout=10)
+       r.raise_for_status()
+       print(f"  Health  : {r.json()}")
+   except Exception as exc:
+       print(f"\n❌ Cannot reach environment at {ENV_BASE_URL}")
+       print(f"   Error: {exc}")
+       print("   Start the server: uvicorn app:app --port 7860")
+       sys.exit(1)
+
+
+   scores: dict[str, float] = {}
+   t0 = time.time()
+
+
+   for task_id in TASKS:
+       scores[task_id] = run_task(task_id)
+
+
+   elapsed = time.time() - t0
+   avg     = sum(scores.values()) / len(scores)
+
+
+   print(f"\n{'='*60}")
+   print("  BASELINE SCORES")
+   print(f"{'='*60}")
+   for tid, sc in scores.items():
+       bar = "█" * int(sc * 30)
+       print(f"  {tid:8s}  {sc:.3f}  {bar}")
+   print(f"  {'average':8s}  {avg:.3f}")
+   print(f"  Elapsed : {elapsed:.1f}s")
+   print(f"{'='*60}")
+
+
+   return scores
+
+
+
+
+if __name__ == "__main__":
+   main()
+
+
