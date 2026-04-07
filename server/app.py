@@ -19,9 +19,12 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 
+import sys
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
+
 from models import BugHuntAction
 from environment import BugHuntEnvironment
-
 
 app = FastAPI(
    title="BugHunt",
@@ -262,6 +265,14 @@ _HTML = """<!DOCTYPE html>
 
 
 
+import uvicorn
+
 @app.get("/web", response_class=HTMLResponse)
 def web_ui():
    return _HTML
+
+def main():
+    uvicorn.run("server.app:app", host="0.0.0.0", port=7860)
+
+if __name__ == "__main__":
+    main()

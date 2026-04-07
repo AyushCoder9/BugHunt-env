@@ -358,7 +358,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 
 
 required_files = [
-   "inference.py", "app.py", "environment.py", "models.py", "tasks.py",
+   "inference.py", "server/app.py", "environment.py", "models.py", "tasks.py",
    "run_server.py", "Dockerfile", "requirements.txt", "openenv.yaml",
    "pyproject.toml", "README.md",
 ]

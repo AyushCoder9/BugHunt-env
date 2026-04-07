@@ -32,8 +32,8 @@ tasks:
  - id: hard
    description: >
      Fix 3 bugs in a grade calculator. Two bugs are interdependent — fixing one without
-    the other produces no improvement. Agent must reason about both before proposing fixes.
-    9 tests, max 20 ops.
+     the other produces no improvement. Agent must reason about both before proposing fixes.
+     9 tests, max 20 ops.
    difficulty: hard
    num_bugs: 3
    max_score: 1.0
@@ -70,12 +70,12 @@ observation_space:
 
 
 reward:
- description: >
-   inspect_function / run_test: 0.0 (free information gathering).
-  propose_fix that improves score: reward = new_score - prev_score (> 0).
-  propose_fix with no improvement or invalid: -0.05.
-  submit() or auto-submit: final_score in [0, 1].
- range: [-0.05, 1.0]
+  description: >
+    inspect_function / run_test: 0.0 (free information gathering).
+    propose_fix that improves score: reward = new_score - prev_score (> 0).
+    propose_fix with no improvement or invalid: -0.05.
+    submit() or auto-submit: final_score in [0, 1].
+  range: [-0.05, 1.0]
 
 
 endpoints:
