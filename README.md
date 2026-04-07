@@ -66,13 +66,17 @@ Rewards are dense and deterministic. Every `propose_fix` that increases the `cur
 ## Setup and Usage
 
 ### Installation
+We recommend using `uv` for dependency management:
 ```bash
-pip install -r requirements.txt
+uv sync
 ```
+*(Alternatively, you can use `pip install -r requirements.txt`)*
 
 ### Running the Server
 ```bash
-uvicorn app:app --host 0.0.0.0 --port 7860
+uv run server
+# OR
+uvicorn server.app:app --host 0.0.0.0 --port 7860
 ```
 
 ### Baseline Agent Execution
@@ -100,5 +104,5 @@ The environment exposes several standard endpoints:
 - `POST /reset`: Initialize a task episode.
 - `POST /step`: Execute an agent action.
 - `GET /state`: View non-destructive environment metadata.
-- `GET /web`: Interactive diagnostic dashboard.
+- `GET /web`: Premium interactive Cyberpunk diagnostic dashboard.
 - `GET /docs`: Full OpenAPI/Swagger specification.
