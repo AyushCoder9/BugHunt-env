@@ -16,7 +16,7 @@ jobs:
           
       - name: Push to HF Hub
         env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
         run: |
           git config --global user.email "bot@huggingface.co"
           git config --global user.name "Hugging Face Automation"
