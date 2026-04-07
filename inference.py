@@ -374,6 +374,7 @@ def run_task(task_id: str) -> float:
    print(f"\n{'='*60}")
    print(f"  TASK: {task_id.upper()}")
    print(f"{'='*60}")
+   print(f"[START] task={task_id}", flush=True)
 
 
    result = reset_env(task_id)
@@ -386,15 +387,18 @@ def run_task(task_id: str) -> float:
 
 
    final_score = 0.0
+   steps_taken = 0
 
 
    for step in range(1, MAX_STEPS + 1):
        if done:
            final_score = result.get("reward") or 0.0
            print(f"\n  ✓ Finished at step {step-1}. Score: {final_score:.3f}")
+           print(f"[END] task={task_id} score={final_score:.2f} steps={steps_taken}", flush=True)
            break
 
 
+       steps_taken = step
        prompt = build_prompt(obs, step)
 
 
@@ -425,6 +429,7 @@ def run_task(task_id: str) -> float:
 
        score_str = f"score={obs.get('current_score', 0):.2f}"
        print(f"         {score_str}  reward={reward:+.3f}  done={done}")
+       print(f"[STEP] step={step} reward={reward}", flush=True)
        if obs.get("message"):
            print(f"         {obs['message'][:100]}")
 
@@ -433,6 +438,7 @@ def run_task(task_id: str) -> float:
        result = step_env({"action_type": "submit"})
        final_score = result.get("reward") or 0.0
        print(f"\n  ⚠ Max steps reached. Score: {final_score:.3f}")
+       print(f"[END] task={task_id} score={final_score:.2f} steps={steps_taken}", flush=True)
 
 
    return final_score
