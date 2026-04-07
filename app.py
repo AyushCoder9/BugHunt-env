@@ -151,71 +151,113 @@ _HTML = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <title>BugHunt — OpenEnv Debugging Environment</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono&display=swap" rel="stylesheet">
 <style>
- body{font-family:monospace;max-width:960px;margin:40px auto;padding:20px;background:#1e1e1e;color:#d4d4d4}
- h1{color:#4ec9b0}h2{color:#9cdcfe}
- code{background:#2d2d2d;padding:2px 6px;border-radius:3px}
- pre{background:#2d2d2d;padding:16px;border-radius:6px;overflow-x:auto}
- a{color:#4fc1ff}
- .badge{display:inline-block;padding:2px 8px;border-radius:3px;font-size:12px;margin:2px}
- .easy{background:#1a4a1a;color:#4ec9b0}
- .medium{background:#4a3a1a;color:#ce9178}
- .hard{background:#4a1a1a;color:#f48771}
+  :root { --bg: #0f172a; --card-bg: rgba(30, 41, 59, 0.7); --accent-glow: rgba(34, 211, 238, 0.5); --text-main: #f8fafc; --text-muted: #94a3b8; }
+  body { font-family: 'Inter', sans-serif; background: #0f172a; color: var(--text-main); margin: 0; padding: 40px 20px; line-height: 1.6; }
+  .container { max-width: 1000px; margin: 0 auto; position: relative; }
+  
+  /* Glow effects */
+  .glow-circle { position: absolute; width: 400px; height: 400px; background: radial-gradient(circle, rgba(168,85,247,0.15) 0%, rgba(15,23,42,0) 70%); top: -100px; left: -100px; z-index: -1; pointer-events: none; }
+  .glow-circle-2 { position: absolute; width: 500px; height: 500px; background: radial-gradient(circle, rgba(34,211,238,0.1) 0%, rgba(15,23,42,0) 70%); bottom: 0; right: -200px; z-index: -1; pointer-events: none; }
+  
+  header { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px; margin-bottom: 40px; }
+  h1 { font-weight: 800; font-size: 2.5rem; margin: 0; background: linear-gradient(to right, #22d3ee, #a855f7); -webkit-background-clip: text; color: transparent; letter-spacing: -1px; }
+  .subtitle { color: var(--text-muted); font-size: 1.1rem; margin-top: 5px; }
+  
+  .status-badge { display: flex; align-items: center; gap: 8px; background: rgba(74, 222, 128, 0.1); border: 1px solid rgba(74, 222, 128, 0.2); padding: 8px 16px; border-radius: 999px; color: #4ade80; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: all 0.3s ease; }
+  .status-badge:hover { background: rgba(74, 222, 128, 0.2); box-shadow: 0 0 15px rgba(74,222,128,0.3); }
+  .pulse { width: 8px; height: 8px; background-color: #4ade80; border-radius: 50%; box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7); animation: pulse 2s infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(74, 222, 128, 0); } 100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); } }
+  
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-bottom: 40px; }
+  .card { background: var(--card-bg); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 24px; transition: transform 0.2s, border-color 0.2s; }
+  .card:hover { transform: translateY(-3px); border-color: rgba(255,255,255,0.15); box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5); }
+  
+  .tag { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 12px; }
+  .tag.easy { background: rgba(74,222,128,0.15); color: #4ade80; }
+  .tag.medium { background: rgba(250,204,21,0.15); color: #facc15; }
+  .tag.hard { background: rgba(248,113,113,0.15); color: #f87171; }
+  
+  .card h3 { margin: 0 0 10px 0; font-size: 1.25rem; }
+  .card p { margin: 0; color: var(--text-muted); font-size: 0.9rem; }
+  .stats { margin-top: 15px; display: flex; gap: 15px; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: #64748b; }
+  
+  .terminal { background: #020617; border: 1px solid #1e293b; border-radius: 12px; padding: 20px; overflow-x: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: #38bdf8; position: relative; }
+  .terminal-header { display: flex; gap: 8px; margin-bottom: 15px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot.r { background: #ef4444; } .dot.y { background: #eab308; } .dot.g { background: #22c55e; }
+  
+  .docs-link { display: inline-block; margin-top: 30px; color: #a855f7; text-decoration: none; font-weight: 600; border-bottom: 1px dashed #a855f7; padding-bottom: 2px; transition: color 0.2s; }
+  .docs-link:hover { color: #d8b4fe; border-bottom-style: solid; }
+  
+  #api-response { white-space: pre-wrap; margin: 0; color: #a3e635; }
 </style>
 </head>
 <body>
-<h1>🔍 BugHunt</h1>
-<p>An OpenEnv RL environment where agents find and fix bugs in Python code.</p>
+<div class="glow-circle"></div>
+<div class="glow-circle-2"></div>
+<div class="container">
+  <header>
+    <div>
+      <h1>BugHunt</h1>
+      <div class="subtitle">OpenEnv Reinforcement Learning Sandbox</div>
+    </div>
+    <div class="status-badge" onclick="pingHealth()" title="Click to ping API health">
+      <div class="pulse"></div>
+      Environment Live
+    </div>
+  </header>
+  
+  <div class="grid">
+    <div class="card">
+      <div class="tag easy">Easy</div>
+      <h3>stats_module</h3>
+      <p>Fix an off-by-one error causing a ZeroDivisionError in average calculation.</p>
+      <div class="stats"><span>1 Bug</span><span>5 Tests</span><span>10 Ops</span></div>
+    </div>
+    <div class="card">
+      <div class="tag medium">Medium</div>
+      <h3>text_processor</h3>
+      <p>Fix two independent logic errors in string manipulation and text slicing.</p>
+      <div class="stats"><span>2 Bugs</span><span>7 Tests</span><span>15 Ops</span></div>
+    </div>
+    <div class="card" style="border-color: rgba(248,113,113,0.3);">
+      <div class="tag hard">Hard</div>
+      <h3>grade_calculator</h3>
+      <p>Identify and patch three bugs, including a complex procedurally interdependent arithmetic error.</p>
+      <div class="stats"><span>3 Bugs</span><span>9 Tests</span><span>20 Ops</span></div>
+    </div>
+  </div>
 
+  <div class="terminal">
+    <div class="terminal-header">
+      <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+    </div>
+    <pre id="api-response">> Awaiting API interaction...
+> Try clicking the "Environment Live" button above to ping /health</pre>
+  </div>
+  
+  <a href="/docs" class="docs-link">View Full Swagger API Documentation &rarr;</a>
+</div>
 
-<h2>Tasks</h2>
-<p>
- <span class="badge easy">EASY</span> 1 bug · 5 tests · stats module<br>
- <span class="badge medium">MEDIUM</span> 2 bugs · 7 tests · text processor<br>
- <span class="badge hard">HARD</span> 3 bugs (2 interdependent) · 9 tests · grade calculator
-</p>
-
-
-<h2>Actions</h2>
-<pre>
-inspect_function  {"action_type":"inspect_function","function_name":"calculate_average"}
-run_test          {"action_type":"run_test","test_id":"E1"}
-propose_fix       {"action_type":"propose_fix","function_name":"calculate_average",
-                  "new_code":"def calculate_average(numbers):\\n    if not numbers:\\n        return 0\\n    return sum(numbers) / len(numbers)"}
-submit            {"action_type":"submit"}
-</pre>
-
-
-<h2>Quick Start</h2>
-<pre>
-# 1. Reset
-curl -X POST "/reset?task_id=easy"
-
-
-# 2. Inspect a function
-curl -X POST "/step" -H "Content-Type: application/json" \
- -d '{"action_type":"inspect_function","function_name":"calculate_average"}'
-
-
-# 3. Run a test
-curl -X POST "/step" -d '{"action_type":"run_test","test_id":"E1"}'
-
-
-# 4. Fix it
-curl -X POST "/step" -H "Content-Type: application/json" \
- -d '{"action_type":"propose_fix","function_name":"calculate_average",
-      "new_code":"def calculate_average(numbers):\\n    if not numbers:\\n        return 0\\n    return sum(numbers) / len(numbers)"}'
-
-
-# 5. Submit
-curl -X POST "/step" -d '{"action_type":"submit"}'
-</pre>
-
-
-<p>Full API: <a href="/docs">/docs</a></p>
+<script>
+  async function pingHealth() {
+    const resBox = document.getElementById('api-response');
+    resBox.innerText = '> Fetching /health...\n';
+    try {
+      const response = await fetch('/health');
+      const data = await response.json();
+      resBox.innerText += '> Response: 200 OK\n';
+      resBox.innerText += JSON.stringify(data, null, 2);
+    } catch (e) {
+      resBox.innerText += '> Error reaching host: ' + e.message;
+      resBox.style.color = '#ef4444';
+    }
+  }
+</script>
 </body>
-</html>
-"""
+</html>"""
 
 
 
