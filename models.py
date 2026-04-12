@@ -1,54 +1,65 @@
+# models.py
 """
-Typed models for BugHunt — the debugging RL environment.
-Follows the OpenEnv spec: Action, Observation, State as Pydantic models.
+Data models for the BugHunt Environment.
+
+BugHunt is an RL environment where agents debug Python code by inspecting
+functions, running tests, proposing fixes, and submitting solutions.
 """
 from __future__ import annotations
+
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+
+from pydantic import Field
+
+# Support both in-repo and standalone imports
+try:
+    from openenv.core.env_server.types import Action, Observation, State
+except ImportError:
+    from openenv.core.env_server.types import Action, Observation, State
 
 
-class BugHuntAction(BaseModel):
+class BugHuntAction(Action):
     """
-    An action the agent takes to investigate and fix bugs.
+    An action the agent takes to debug Python code.
 
-    action_type options
-    -------------------
-    inspect_function   – read the source code of one function
-    run_test           – run a specific test case, see pass/fail + output
-    propose_fix        – replace a function with new implementation
-    submit             – finalise the episode
+    action_type options:
+        inspect_function  - read source code of a function (free, reward=0)
+        run_test          - run a test case, see pass/fail + hint (free, reward=0)
+        propose_fix       - replace a function with corrected code (scored)
+        submit            - finalise the episode
     """
-    action_type: str
-    function_name: Optional[str] = None   # for inspect_function, propose_fix
-    test_id: Optional[str] = None         # for run_test
-    new_code: Optional[str] = None        # for propose_fix: full def block
+
+    action_type: str = Field(
+        ..., description="inspect_function|run_test|propose_fix|submit"
+    )
+    function_name: Optional[str] = Field(
+        None, description="Target function name"
+    )
+    test_id: Optional[str] = Field(
+        None, description="Test ID to run (e.g. E1, M3, H5)"
+    )
+    new_code: Optional[str] = Field(
+        None, description="Complete def block for propose_fix"
+    )
 
 
-class TestResult(BaseModel):
-    test_id: str
-    description: str
-    status: str        # "pass" | "fail" | "error" | "not_run"
-    output: str = ""   # what went wrong (empty on pass)
+class BugHuntObservation(Observation):
+    """Full observation returned after each action."""
 
-
-class BugHuntObservation(BaseModel):
-    """What the agent sees after each action."""
-    # OpenEnv base fields
-    done: bool = False
-    reward: Optional[float] = None
-
-    # Task context
+    # Task info
     task_id: str = ""
     task_description: str = ""
-    task_context: str = ""          # narrative about what the module does
+    task_context: str = ""
 
-    # Available targets
+    # What the agent can interact with
     available_functions: List[str] = Field(default_factory=list)
     available_tests: List[str] = Field(default_factory=list)
 
-    # State
-    inspected_functions: Dict[str, str] = Field(default_factory=dict)   # name → source
-    test_results: List[TestResult] = Field(default_factory=list)
+    # State the agent has built up
+    inspected_functions: Dict[str, str] = Field(default_factory=dict)
+    test_results: List[Dict[str, Any]] = Field(default_factory=list)
+
+    # Progress tracking
     operations_log: List[str] = Field(default_factory=list)
     operations_remaining: int = 20
     current_score: float = 0.0
@@ -57,10 +68,12 @@ class BugHuntObservation(BaseModel):
     message: str = ""
 
 
-class BugHuntState(BaseModel):
-    """Episode metadata."""
-    episode_id: Optional[str] = None
-    step_count: int = 0
+class BugHuntState(State):
+    """Episode metadata. episode_id and step_count are inherited from State."""
+
     task_id: str = ""
     final_score: Optional[float] = None
     is_submitted: bool = False
+
+
+__all__ = ["BugHuntAction", "BugHuntObservation", "BugHuntState"]

@@ -9,100 +9,148 @@ tags:
   - openenv
 ---
 
-# BugHunt: Interactive RL Debugging Environment
+# 🔍 BugHunt — Python Debugging RL Environment
 
-BugHunt is an OpenEnv-compliant reinforcement learning environment developed for the Meta x Hugging Face OpenEnv Hackathon. It challenges AI agents to diagnose and repair software bugs within a controlled, observable sandbox.
+**BugHunt** is an OpenEnv-compliant reinforcement learning environment where AI agents learn to debug Python code through systematic investigation and targeted fixes.
 
-## Overview
+## 🎯 Concept
 
-Unlike static code repair benchmarks, BugHunt implements a dynamic debugging trajectory. Agents are provided with a buggy Python module and must manage a finite operation budget to inspect source code, execute tests, and verify patches.
+Agents receive buggy Python functions and must:
+1. **Inspect** function source code (free — no penalty)
+2. **Run tests** to identify failures and read hints (free)
+3. **Propose fixes** — submit corrected function definitions (scored)
+4. **Submit** to finalize their solution
 
-### Key Technical Challenges
+This mirrors real-world debugging: gather information → form hypotheses → apply fixes → validate.
 
-The environment focuses on "Hard" debugging scenarios that defeat naive LLM strategies. Specifically, the **Hard Task** features an interdependency mechanic where two separate bugs must be identified and fixed simultaneously; patching only one results in zero reward, forcing the agent to demonstrate genuine causal reasoning.
+## 🧩 Tasks
 
-## Task Specifications
+| Task | Difficulty | Bugs | Tests | Max Ops | Key Challenge |
+|------|-----------|------|-------|---------|---------------|
+| `easy` | ⭐ | 1 | 5 | 10 | Off-by-one divisor in `calculate_average` |
+| `medium` | ⭐⭐ | 2 | 7 | 15 | Two independent bugs in text processing |
+| `hard` | ⭐⭐⭐ | 3 | 9 | 20 | **Two interdependent bugs** + one independent |
 
-| Difficulty | Module | Bugs | Tests | Max Operations |
-|:---|:---|:---:|:---:|:---:|
-| **Easy** | stats_module | 1 | 5 | 10 |
-| **Medium** | text_processor | 2 | 7 | 15 |
-| **Hard** | grade_calculator | 3 | 9 | 20 |
+### Hard Mode — Interdependent Bugs 🔗
 
-### 1. Easy Task
-Focuses on a standard off-by-one error in a statistics utility. Ideal for verifying baseline operation logic.
+The hard task features a unique challenge: two of three bugs are **interdependent**. Fixing Bug 2 alone produces zero observable improvement because Bug 1 masks its effect. The agent must understand both bugs before fixing either — a test of genuine debugging reasoning, not just pattern matching.
 
-### 2. Medium Task
-Features two independent logic errors in string manipulation and text slicing routines. Requires sequential diagnostic steps.
+## 📋 Action Space
 
-### 3. Hard Task
-Includes three bugs, two of which are procedurally interdependent. The agent must analyze cross-function calls within a grade calculation system to find a hidden arithmetic error that masks an argument-order bug.
+| Action | Parameters | Reward | Description |
+|--------|-----------|--------|-------------|
+| `inspect_function` | `function_name` | `0.0` | Read function source code |
+| `run_test` | `test_id` | `0.0` | Execute test, see pass/fail + hint |
+| `propose_fix` | `function_name`, `new_code` | `Δscore` or `-0.05` | Replace function with fix |
+| `submit` | — | `final_score` | Finalize episode |
 
-## Environment Mechanics
+### Action JSON Format
 
-### Action Space
-Agents interact via a structured JSON API:
-- `inspect_function`: Retrieves raw source code for a specific function (0 cost).
-- `run_test`: Executes a test case and returns the traceback/hint (0 cost).
-- `propose_fix`: Replaces a function implementation with user-provided code (1 cost).
-- `submit`: Terminates the episode and returns the final score (1 cost).
-
-### Observation Space
-The state returned after every action includes:
-- `inspected_functions`: A map of function names to their current source code.
-- `test_results`: Detailed status and failure hints for every test in the suite.
-- `current_score`: The current ratio of passing tests (0.0 to 1.0).
-- `metadata`: Operations remaining, task context, and available function symbols.
-
-### Reward Signal
-Rewards are dense and deterministic. Every `propose_fix` that increases the `current_score` generates a positive reward signal (`new_score - prev_score`). Invalid actions or regressions incur a `-0.05` penalty.
-
-## Implementation Details
-
-- **Deterministic Graders**: All tasks use fixed, non-flaky testing logic.
-- **Provider Fallback Agent**: The provided `inference.py` implementation uses an automated fallback loop (OpenAI -> Groq -> Gemini) to ensure reliability during rate-limiting or quota exhaustion.
-- **Security**: Function execution is wrapped in a shared, restricted namespace with safe `__builtins__` to prevent exploit-driven solutions.
-
-## Setup and Usage
-
-### Installation
-We recommend using `uv` for dependency management:
-```bash
-uv sync
+```json
+{"action_type": "inspect_function", "function_name": "calculate_average"}
+{"action_type": "run_test", "test_id": "E1"}
+{"action_type": "propose_fix", "function_name": "calculate_average", "new_code": "def calculate_average(numbers):\n    if not numbers:\n        return 0\n    return sum(numbers) / len(numbers)\n"}
+{"action_type": "submit"}
 ```
-*(Alternatively, you can use `pip install -r requirements.txt`)*
 
-### Running the Server
+## 📊 Observation Space
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `done` | `bool` | Episode complete? |
+| `reward` | `float \| null` | Reward for last action |
+| `task_id` | `str` | Current task ID |
+| `task_context` | `str` | Natural language task description |
+| `available_functions` | `list[str]` | Function names available to inspect |
+| `available_tests` | `list[str]` | Test IDs available to run |
+| `inspected_functions` | `dict[str, str]` | Source code inspected so far |
+| `test_results` | `list[dict]` | Status + hints per test |
+| `operations_log` | `list[str]` | History of actions taken |
+| `operations_remaining` | `int` | Ops left before auto-submit |
+| `current_score` | `float` | `tests_passed / tests_total` |
+| `tests_passed` | `int` | Number of passing tests |
+| `tests_total` | `int` | Total number of tests |
+| `message` | `str` | Human-readable status message |
+
+## 🏆 Reward Design
+
+| Event | Reward | Rationale |
+|-------|--------|-----------|
+| `inspect_function` | `0.0` | Free information gathering |
+| `run_test` | `0.0` | Free information gathering |
+| `propose_fix` (improves score) | `new_score - old_score` | Positive delta |
+| `propose_fix` (no improvement) | `-0.05` | Small penalty for bad fixes |
+| Invalid action | `-0.05` | Penalty for errors |
+| `submit` | `final_score ∈ [0, 1]` | Fraction of tests passing |
+
+## 🚀 Quick Start
+
+### Using the Client
+
+```python
+from client import BugHuntEnv
+from models import BugHuntAction
+
+# Async usage
+async with BugHuntEnv(base_url="https://ayushxx9-bughunt-env.hf.space") as env:
+    result = await env.reset(task_id="easy")
+    result = await env.inspect_function("calculate_average")
+    result = await env.run_test("E1")
+    result = await env.propose_fix(
+        "calculate_average",
+        "def calculate_average(numbers):\\n    if not numbers:\\n        return 0\\n    return sum(numbers) / len(numbers)\\n"
+    )
+    result = await env.submit()
+    print(f"Score: {result.reward}")
+```
+
+### Using HTTP Directly
+
 ```bash
-uv run server
-# OR
+# Health check
+curl https://ayushxx9-bughunt-env.hf.space/health
+
+# Reset
+curl -X POST "https://ayushxx9-bughunt-env.hf.space/reset?task_id=easy"
+
+# Step
+curl -X POST https://ayushxx9-bughunt-env.hf.space/step \
+  -H "Content-Type: application/json" \
+  -d '{"action_type": "inspect_function", "function_name": "calculate_average"}'
+```
+
+### Running Locally
+
+```bash
+pip install -r requirements.txt
 uvicorn server.app:app --host 0.0.0.0 --port 7860
 ```
 
-### Baseline Agent Execution
-```bash
-cp .env.example .env
-# Configure your API keys in .env
-python3 inference.py
-```
+## 📈 Expected Baseline Scores
 
-## Performance Benchmarks
+| Task | Score | Notes |
+|------|-------|-------|
+| easy | ~1.000 | Off-by-one trivially found |
+| medium | ~0.857 | Both text bugs usually found |
+| hard | ~0.556 | Interdependency is challenging |
+| **average** | **~0.804** | |
 
-Results using the baseline `inference.py` agent (GPT-4o-mini / Llama-3.3-70B):
+## 🔧 Environment Variables
 
-| Task | Score | Latency (Avg) |
-|:---|:---:|:---:|
-| Easy | 1.000 | < 10s |
-| Medium | 1.000 | < 30s |
-| Hard | 1.000 | < 60s |
-| **Average** | **1.000** | **~90s Total** |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `API_BASE_URL` | `https://api.openai.com/v1` | LLM API endpoint |
+| `MODEL_NAME` | `gpt-4o-mini` | Model for inference |
+| `HF_TOKEN` | — | HuggingFace / API token |
+| `ENV_BASE_URL` | `http://localhost:7860` | Environment server URL |
 
-## API Reference
+## 📝 Technical Details
 
-The environment exposes several standard endpoints:
-- `GET /health`: System liveness check.
-- `POST /reset`: Initialize a task episode.
-- `POST /step`: Execute an agent action.
-- `GET /state`: View non-destructive environment metadata.
-- `GET /web`: Premium interactive Cyberpunk diagnostic dashboard.
-- `GET /docs`: Full OpenAPI/Swagger specification.
+- **SDK:** Built on `openenv-core` with proper `Environment`, `Action`, `Observation`, `State` types
+- **Grading:** 100% deterministic — no randomness, no LLM-as-judge
+- **Sandbox:** Code execution uses restricted builtins (no `import`, no `eval`, no file access)
+- **Concurrency:** Supports concurrent sessions via OpenEnv WebSocket protocol
+
+## 📄 License
+
+MIT
