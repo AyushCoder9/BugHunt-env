@@ -81,6 +81,18 @@ class BugHuntEnvironment(Environment[BugHuntAction, BugHuntObservation, BugHuntS
         self._ops_log: List[str] = []
         self._submitted = False
 
+    def close(self):
+        """No-op: singleton env must survive between HTTP requests.
+
+        The SDK's get_state_handler and get_metadata_handler call
+        _env.close() after each request. Since we use a singleton
+        factory for HTTP statefulness, close() must be a no-op,
+        otherwise the Gradio web UI's background polling of /state
+        and /metadata would destroy episode state between reset()
+        and step() calls.
+        """
+        pass
+
     def reset(
         self,
         seed: Optional[int] = None,
