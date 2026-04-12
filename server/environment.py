@@ -80,9 +80,6 @@ class BugHuntEnvironment(Environment[BugHuntAction, BugHuntObservation, BugHuntS
         self._test_results: Dict[str, dict] = {}
         self._ops_log: List[str] = []
         self._submitted = False
-        
-        # Initialize default state so _task is never None
-        self.reset(task_id="easy")
 
     def reset(
         self,
@@ -138,6 +135,10 @@ class BugHuntEnvironment(Environment[BugHuntAction, BugHuntObservation, BugHuntS
         **kwargs: Any,
     ) -> BugHuntObservation:
         """Execute one action in the environment."""
+        if self._task is None:
+            # Environment not initialized — auto-reset to easy
+            self.reset(task_id="easy")
+
         if self._submitted:
             return self._make_obs(
                 reward=0.0, done=True, message="Episode already submitted."
@@ -328,6 +329,15 @@ class BugHuntEnvironment(Environment[BugHuntAction, BugHuntObservation, BugHuntS
 
     def _make_obs(self, reward, done, message) -> BugHuntObservation:
         """Construct an observation from current state."""
+        if self._task is None:
+            return BugHuntObservation(
+                done=done, reward=reward, task_id="",
+                task_description="No task loaded", task_context="Call reset first.",
+                available_functions=[], available_tests=[],
+                inspected_functions={}, test_results=[], operations_log=[],
+                operations_remaining=0, current_score=0.0,
+                tests_passed=0, tests_total=0, message=message,
+            )
         ops_rem = max(0, self._task.max_operations - self._state.step_count)
         score = self._score()
         passed = sum(1 for t in self._task.tests if self._try_run(t))

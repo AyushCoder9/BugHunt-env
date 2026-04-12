@@ -286,7 +286,7 @@ app = create_app(
     BugHuntAction,
     BugHuntObservation,
     env_name="bughunt_env",
-    max_concurrent_envs=1,
+    max_concurrent_envs=8,
     gradio_builder=build_bughunt_ui,
 )
 
