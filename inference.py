@@ -67,8 +67,9 @@ def reset_env(task_id: str) -> dict:
     )
     r.raise_for_status()
     return r.json()
-    r.raise_for_status()
-    return r.json()
+
+
+
 
 
 def step_env(action: dict) -> dict:

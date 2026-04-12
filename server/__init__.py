@@ -3,7 +3,8 @@
 
 try:
     from .environment import BugHuntEnvironment
+    from .gradio_ui import build_bughunt_ui
 except ImportError:
     pass
 
-__all__ = ["BugHuntEnvironment"]
+__all__ = ["BugHuntEnvironment", "build_bughunt_ui"]

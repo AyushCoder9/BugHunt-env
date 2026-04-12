@@ -7,7 +7,8 @@ WORKDIR /app
 # Environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app
+    PYTHONPATH=/app \
+    ENABLE_WEB_INTERFACE=true
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
