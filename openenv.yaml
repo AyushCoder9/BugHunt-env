@@ -1,6 +1,57 @@
-spec_version: 1
-name: bughunt_env
-type: space
-runtime: fastapi
-app: server.app:app
-port: 7860
+name: bughunt-env
+version: "1.0.0"
+description: >
+  An OpenEnv RL environment where AI agents debug Python code.
+  Agents inspect functions, run tests, and propose fixes to earn rewards.
+  Three tasks: easy (1 bug), medium (2 bugs), hard (3 interdependent bugs).
+author: ayushxx9
+tags:
+  - openenv
+  - debugging
+  - code
+  - real-world
+
+tasks:
+  - id: easy
+    description: "Fix 1 off-by-one bug in statistics module. 5 tests, 10 ops."
+    difficulty: easy
+    max_score: 1.0
+    max_operations: 10
+  - id: medium
+    description: "Fix 2 independent bugs in text processor. 7 tests, 15 ops."
+    difficulty: medium
+    max_score: 1.0
+    max_operations: 15
+  - id: hard
+    description: "Fix 3 bugs in grade calculator, 2 interdependent. 9 tests, 20 ops."
+    difficulty: hard
+    max_score: 1.0
+    max_operations: 20
+
+action_space:
+  type: structured_json
+  description: >
+    JSON with action_type (inspect_function|run_test|propose_fix|submit),
+    optional function_name, optional test_id, optional new_code.
+
+observation_space:
+  type: structured_json
+  fields:
+    done: "bool"
+    reward: "float | null"
+    task_id: "str"
+    current_score: "float"
+    tests_passed: "int"
+    tests_total: "int"
+    available_functions: "list[str]"
+    available_tests: "list[str]"
+    inspected_functions: "dict[str,str]"
+    test_results: "list"
+    operations_remaining: "int"
+    message: "str"
+
+reward:
+  description: >
+    inspect/run_test: 0.0 (free). propose_fix improving score: new_score-prev_score.
+    propose_fix no improvement or invalid: -0.05. submit: final_score in [0,1].
+  range: [-0.05, 1.0]
