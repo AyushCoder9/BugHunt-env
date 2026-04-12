@@ -46,6 +46,14 @@ app = create_app(
     max_concurrent_envs=1,
 )
 
+from fastapi.responses import RedirectResponse
+
+@app.get("/")
+def read_root():
+    """Redirect to Swagger UI documentation."""
+    return RedirectResponse(url="/docs")
+
+
 
 def main(host: str = "0.0.0.0", port: int | None = None):
     """Run the BugHunt environment server with uvicorn."""
