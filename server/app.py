@@ -435,7 +435,7 @@ def get_capabilities():
     """
     return {
         "name": "BugHunt",
-        "version": "2.0.0",
+        "version": "2.1.0",
         "sdk": "openenv-core",
         "features": {
             "deterministic_grading": True,

@@ -1,4 +1,5 @@
 # Dockerfile for BugHunt OpenEnv Environment
+# BUILD_TAG=v2.1.0-session-fix
 FROM python:3.11-slim
 
 # Set working directory
