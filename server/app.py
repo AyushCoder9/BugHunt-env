@@ -272,11 +272,25 @@ BUG_DEPENDENCY_GRAPH = {
 }
 
 
-# ── Environment factory ────────────────────────────────────────────────────
+# ── Environment factory (singleton for HTTP statefulness) ──────────────────
+#
+# IMPORTANT: The SDK's HTTP handlers call the factory on EVERY request.
+# (reset_handler and step_handler both do `_env = self._env_factory()`)
+# Without a singleton, each HTTP call creates a brand new env, losing all
+# state between reset() and step(). The singleton ensures the RL loop works
+# correctly across multiple HTTP requests.
+#
+# WebSocket sessions use their own separate env instances managed by the SDK.
+
+_singleton_env: Optional[BugHuntEnvironment] = None
+
 
 def create_bughunt_environment() -> BugHuntEnvironment:
-    """Factory function for BugHuntEnvironment instances."""
-    return BugHuntEnvironment()
+    """Factory function — returns singleton for HTTP state persistence."""
+    global _singleton_env
+    if _singleton_env is None:
+        _singleton_env = BugHuntEnvironment()
+    return _singleton_env
 
 
 # ── Create app ──────────────────────────────────────────────────────────────

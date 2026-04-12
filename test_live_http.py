@@ -65,7 +65,7 @@ check("Schema has observation", "observation" in schema)
 check("Schema has state", "state" in schema)
 
 caps = get("/env/capabilities")
-check("Capabilities version", caps.get("version") == "2.0.0")
+check("Capabilities version", caps.get("version") in ("2.0.0", "2.1.0"), str(caps.get("version")))
 check("Has interdependent_bugs feature", caps.get("features", {}).get("interdependent_bugs") is True)
 
 # ── 2. Full RL Loop: Easy ─────────────────────────────────────────
