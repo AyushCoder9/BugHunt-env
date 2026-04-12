@@ -142,6 +142,7 @@ def parse_action(text: str) -> dict:
 
 def run_task(task_id: str) -> float:
     """Run a single task and return the final score."""
+    print(f"[START] task={task_id}", flush=True)
     log("task_start", task_id=task_id)
     result = reset_env(task_id)
     obs = result["observation"]
@@ -157,6 +158,7 @@ def run_task(task_id: str) -> float:
     for step in range(1, MAX_STEPS + 1):
         if done:
             final_score = result.get("reward") or 0.0
+            print(f"[END] task={task_id} score={final_score:.3f} steps={step - 1}", flush=True)
             log("task_done", task_id=task_id, step=step - 1, score=f"{final_score:.3f}")
             break
 
@@ -189,6 +191,7 @@ def run_task(task_id: str) -> float:
         result = step_env(action)
         obs = result.get("observation", {})
         done = result.get("done", False)
+        print(f"[STEP] step={step} reward={result.get('reward', 0.0):.3f}", flush=True)
         log(
             "step_result",
             task_id=task_id,
@@ -200,6 +203,7 @@ def run_task(task_id: str) -> float:
         # Force submit if max steps reached
         result = step_env({"action_type": "submit"})
         final_score = result.get("reward") or 0.0
+        print(f"[END] task={task_id} score={final_score:.3f} steps={MAX_STEPS}", flush=True)
         log("forced_submit", task_id=task_id, score=f"{final_score:.3f}")
 
     return final_score
